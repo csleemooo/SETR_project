@@ -1,7 +1,13 @@
 # SETR_project
 
 ## Dataset <br />
- 구글드라이브 공유된 데이터 -> oct_data\train\... & oct_\test\... 형태로 이동
+ 구글드라이브 공유된 데이터 -> oct_data\train\... & oct_data\test\... 로 이동 <br />
+ 
+ | OCT machine | # patient | Train | Validation |
+|-------------|-----------|-------|------------|
+| Cirrus      | 1-24      | 6-24  | 1-5        |
+| Spectralis  | 25-48     | 30-48 | 25-29      |
+| Topcon      | 49-70     | 53-70 | 49-52      |
 
 ## Run
 python SETR_train.py --model=="model_name"
