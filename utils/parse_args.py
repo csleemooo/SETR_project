@@ -14,8 +14,6 @@ def parse_args():
     parser.add_argument("--epochs", default=50, type=int)
     parser.add_argument("--ckpt", default=50, type=int)
     parser.add_argument("--lr", default=1e-3, type=float)
-    parser.add_argument("--lr_decay_epoch", default=5, type=int)
-    parser.add_argument("--lr_decay_rate", default=0.9, type=float)
     parser.add_argument("--crop_size", default=(480, 480), type=tuple)
 
 
