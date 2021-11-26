@@ -65,57 +65,40 @@ def _random_crop(img1):
     return img1
 
 def sync_transform(*images):
-    # w, h = images[0].size  # assuming w=512, h<=1024
-    # assert w == 512
-    # if h < 1024:
-    #     # pad to 1024
-    #     diff = 1024 - h
-    #     images = [tf.pad(image, (0, 0, diff // 2, diff - diff // 2)) for image in images]
-    # w, h = images[0].size
-    # assert h == 1024
-
-    images = [_random_crop(image) for image in images]
-    w, h = images[0].size
 
     # random horizontal flip.un
+    if random.random() < 0.5 : 
 
-    images = [tf.hflip(image) for image in images]
-
-
-    # random pad
-    # if random.random() < 0.5 :
-    #    images = [tf.pad(image, 64) for image in images]
+        images = [tf.hflip(image) for image in images]
 
     # random rotation
     angle = 0
     if random.random() < 0.5:
         angle = random.randint(-15, 15)
-        # images = [tf.rotate(image, angle, resample=PIL.Image.BILINEAR) for image in images]
 
     # random scale
     scale = 1
     if random.random() < 0.5:
-        scale = random.uniform(7 / 8, 9 / 8)
+        scale = random.uniform(480 / 512, 9 / 8)
 
     images = [tf.affine(image, angle=angle, scale=scale, translate=(0, 0), shear=0,
                         resample=PIL.Image.BILINEAR) for image in images]
 
-    images = [tf.pad(image, 64) for image in images]
 
-    W, H = images[0].size
-    assert H >= h
-    assert W >= w
+    crop_w = 480
+    crop_h = 480
+    crop_size=(crop_w, crop_h)
 
-    h_diff = H - h
-    w_diff = W - w
+    w, h = images[0].size
+    assert w >= crop_w and h >= crop_h, \
+        f'Error: Crop size: {crop_size}, Image size: ({w}, {h})'
 
-    if random.random() < 0.5:
-        # Center crop with 50% chance
-        h_start, w_start = h_diff // 2, w_diff // 2
-    else:
-        h_start, w_start = random.randint(0, h_diff), random.randint(0, w_diff)
+    i = np.random.randint(0, h - crop_h + 1)
+    j = np.random.randint(0, w - crop_w + 1)
 
-    images = [tf.crop(image, h_start, w_start, h, w) for image in images]
+    images = [tf.crop(img, i, j, crop_h, crop_w) for img in images]    
+
+
 
     return images
 
