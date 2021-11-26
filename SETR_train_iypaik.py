@@ -44,6 +44,8 @@ if __name__ == '__main__':
     model = model.to(device)
 
     # data size: (650, 512), (496, 512), (885, 512), (1024, 512)
+
+    transform_val = transforms.Compose([transforms.CenterCrop(480)])    
     dataset_train = oct_dataset(data_path=os.path.join(args.data_path, 'train', 'images'),
                                 label_path=os.path.join(args.data_path, 'train', 'labels'),
                                 sync_transform=sync_transform)
@@ -105,10 +107,20 @@ if __name__ == '__main__':
             
             loss.backward()
             optimizer.step()
+            
+            if b_idx == 0 : 
+                img_idx = 0
+                image_, target_, pred_ = image[img_idx][0].cpu().detach().numpy(), target[img_idx], pred[img_idx]
+                target_ = convert_to_RGB_image(convert_to_label(target_))
+                pred_ = convert_to_RGB_image(pred_)
+            
+                save_image(image_, 'sample_image.png')
+                save_image(target_, 'sample_target.png')
+                save_image(pred_, 'sample_pred.png')              
 
             if (b_idx + 1) % args.ckpt == 0:  # checkpoint
                 current_IoU = i_train_set[-1]/u_train_set[-1]
-                print(pred[0,:,0])
+                #print(pred[0,:,0])
                 print("[Epoch: %d/%d iteration:%d/%d] Train Loss: %2.4f" % (
                     epoch + 1, args.epochs, b_idx + 1, len(train_loader), np.mean(loss_train_set[-1])), 
                       f'IoU : {current_IoU.tolist()}, mIoU : {current_IoU.mean().item()}'
@@ -148,9 +160,9 @@ if __name__ == '__main__':
                     target_ = convert_to_RGB_image(convert_to_label(target_))
                     pred_ = convert_to_RGB_image(pred_)
     
-                    save_image(image_, os.path.join(args.ckpt_path, 'test_', str(epoch)+'_'+str(img_num) + '_input.png'))
-                    save_image(target_, os.path.join(args.ckpt_path, 'test_', str(epoch)+'_'+str(img_num) + '_target.png'))
-                    save_image(pred_, os.path.join(args.ckpt_path, 'test_', str(epoch)+'_'+str(img_num) + '_pred.png' ''))
+                    save_image(image_, os.path.join(args.ckpt_path, 'test_', 'epoch'+str(epoch)+'_'+str(img_num) + '_input.png'))
+                    save_image(target_, os.path.join(args.ckpt_path, 'test_', 'epoch'+str(epoch)+'_'+str(img_num) + '_target.png'))
+                    save_image(pred_, os.path.join(args.ckpt_path, 'test_', 'epoch'+str(epoch)+'_'+str(img_num) + '_pred.png' ''))
                     if args.fast_pass : 
                         break 
                 
