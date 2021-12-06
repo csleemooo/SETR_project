@@ -4,7 +4,7 @@ from torch.utils.data import DataLoader
 import os
 
 from setr.SETR import *
-from setr.unet import UNet
+# from setr.unet import UNet
 
 from utils.data_load import sync_transform, oct_dataset
 from utils.parse_args import parse_args
@@ -14,6 +14,13 @@ from utils import functions
 from torchmetrics.functional import iou
 from torchvision import transforms
 import pdb
+
+def targetToOne(target):
+    onech_target = torch.zeros((4, 480, 480), dtype=torch.long)
+    for i in range(4):
+        onech_target[i] = target[i][0] * 1 + target[i][1] * 2 + target[i][2] *3
+    
+    return onech_target
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -34,21 +41,19 @@ if __name__ == '__main__':
     #     'SETR_MLA_S', 'SETR_MLA_L', 'SETR_MLA_H',
 
     used_model = eval(args.model)
-    try : 
-        aux_layers, model = used_model(dataset='oct')
-        aux=True 
-    except : 
-        model = used_model(dataset='oct')
-        aux=False 
+    aux_layers, model = used_model(dataset='oct')
+    aux = aux_layers is not None
 
-    model = model.to(device)
+    model = nn.DataParallel(model.cuda()).to(device)
+
+    # model = model.to(device)
 
     # data size: (650, 512), (496, 512), (885, 512), (1024, 512)
 
     transform_val = transforms.Compose([transforms.CenterCrop(480)])    
     dataset_train = oct_dataset(data_path=os.path.join(args.data_path, 'train', 'images'),
                                 label_path=os.path.join(args.data_path, 'train', 'labels'),
-                                sync_transform=sync_transform)
+                                sync_transform=None, transform=transform_val)
 
     train_loader = DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True)
 
@@ -66,7 +71,9 @@ if __name__ == '__main__':
         
     activation = torch.nn.Sigmoid()
 
-    optimizer = torch.optim.Adam(params=model.parameters(), lr=args.lr, betas=(0.5, 0.99))
+    aux_criterion = nn.CrossEntropyLoss()
+
+    optimizer = torch.optim.Adam(params=model.parameters(), lr=args.lr, betas=(0.9, 0.99))
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.epochs//3, gamma=0.1)
     loss_train_set = []
     i_train_set = []
@@ -74,6 +81,8 @@ if __name__ == '__main__':
     loss_val_set = []
     i_val_set = []
     u_val_set = []
+
+    aux_loss = []
 
     best_val_loss = 1e+4
 
@@ -91,12 +100,17 @@ if __name__ == '__main__':
 
             optimizer.zero_grad()
             if aux : 
-                pred = model(image, aux_layers)
+                pred, aux_outs = model(image, aux_layers)
+                pred = activation(pred)
+                loss = criterion(pred, target)
+                for _, value in aux_outs.items(): 
+                    value = activation(value) 
+                    loss += criterion(value, target)
+
             else : 
                 pred = model(image)
-            pred = activation(pred)
-
-            loss = criterion(pred, target)
+                pred = activation(pred)
+                loss = criterion(pred, target)
 
             loss_train_set[-1].append(loss.item())
             #iou_train_set[-1].append(iou(convert_to_label(pred), convert_to_label(target)).item())
@@ -104,10 +118,8 @@ if __name__ == '__main__':
             i_train_set[-1] += intersection
             u_train_set[-1] += union 
             
-            
             loss.backward()
             optimizer.step()
-            
             if b_idx == 0 : 
                 img_idx = 0
                 image_, target_, pred_ = image[img_idx][0].cpu().detach().numpy(), target[img_idx], pred[img_idx]
@@ -120,14 +132,13 @@ if __name__ == '__main__':
 
             if (b_idx + 1) % args.ckpt == 0:  # checkpoint
                 current_IoU = i_train_set[-1]/u_train_set[-1]
-                #print(pred[0,:,0])
                 print("[Epoch: %d/%d iteration:%d/%d] Train Loss: %2.4f" % (
                     epoch + 1, args.epochs, b_idx + 1, len(train_loader), np.mean(loss_train_set[-1])), 
                       f'IoU : {current_IoU.tolist()}, mIoU : {current_IoU.mean().item()}'
                       )
                 if args.fast_pass : 
                     break 
-                
+
         scheduler.step()
         model.eval()
         save_set = [62, 194, 443, 3125, 3276, 3400, 5781, 5881]
@@ -142,7 +153,7 @@ if __name__ == '__main__':
                 target = target.to(device).float()
     
                 if aux : 
-                    pred = model(image, aux_layers)
+                    pred, aux_outs = model(image, aux_layers)
                 else : 
                     pred = model(image)
                 

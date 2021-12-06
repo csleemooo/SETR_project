@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 import numpy as np
+from utils.functions import *
 import PIL
 from PIL import Image, ImageFilter
 import os
@@ -10,10 +11,10 @@ import random
 import glob
 import pdb
 import math
-import random
 import time
 from torchvision.utils import save_image
 import torchvision.transforms.functional as tf
+
 
 
 def integer_to_channels(target):
@@ -131,7 +132,9 @@ class oct_dataset(object):
             image = self.transform(image)
             label = self.transform(label)
 
+        
         image = image.filter(ImageFilter.MedianFilter(size=5))
+
 
         image = self.totensor(image)
         label = self.totensor(label)
