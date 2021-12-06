@@ -118,6 +118,9 @@ class SegmentationTransformer(nn.Module):
     def decode(self, x):
         raise NotImplementedError("Should be implemented in child class!!")
 
+    def aux_decode(self, x):
+        raise NotImplementedError("Should be implemented in child class!!")
+
     def forward(self, x, auxillary_output_layers=None):
         encoder_output, intmd_encoder_outputs = self.encode(x)
         decoder_output = self.decode(
@@ -129,7 +132,7 @@ class SegmentationTransformer(nn.Module):
             for i in auxillary_output_layers:
                 val = str(2 * i - 1)
                 _key = 'Z' + str(i)
-                auxillary_outputs[_key] = intmd_encoder_outputs[val]
+                auxillary_outputs[_key] = self.aux_decode(intmd_encoder_outputs[val])
 
             return decoder_output, auxillary_outputs
 
@@ -218,6 +221,9 @@ class SETR_Naive(SegmentationTransformer):
         x = self.upsample(x)
         return x
 
+    def aux_decode(self, x):
+        return self.decode(x, None)
+
 
 class SETR_PUP(SegmentationTransformer):
     def __init__(
@@ -292,6 +298,9 @@ class SETR_PUP(SegmentationTransformer):
         x = self._reshape_output(x)
         x = self.decode_net(x)
         return x
+    
+    def aux_decode(self, x):
+        return self.decode(x, None)
 
 
 class SETR_MLA(SegmentationTransformer):
@@ -326,6 +335,7 @@ class SETR_MLA(SegmentationTransformer):
 
         self.num_classes = num_classes
         self._init_decode()
+        self._init_aux_decode()
 
     def _init_decode(self):
         self.net1_in, self.net1_intmd, self.net1_out = self._define_agg_net()
@@ -391,6 +401,38 @@ class SETR_MLA(SegmentationTransformer):
         out = self.output_net(out)
         return out
 
+    
+    def _init_aux_decode(self):
+        self.conv1 = nn.Conv2d(
+            in_channels=self.embedding_dim,
+            out_channels=self.embedding_dim,
+            kernel_size=1,
+            stride=1,
+            padding=self._get_padding('VALID', (1, 1),),
+        )
+        self.bn1 = nn.BatchNorm2d(self.embedding_dim)
+        self.act1 = nn.ReLU()
+        self.conv2 = nn.Conv2d(
+            in_channels=self.embedding_dim,
+            out_channels=self.num_classes,
+            kernel_size=1, 
+            stride=1,
+            padding=self._get_padding('VALID', (1, 1),),
+        )
+        self.upsample = nn.Upsample(
+            scale_factor=self.patch_dim, mode='bilinear'
+        )
+
+    def aux_decode(self, x):
+        x = self._reshape_output(x)
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.act1(x)
+        x = self.conv2(x)
+        x = self.upsample(x)
+        return x
+
+    
     # fmt: off
     def _define_agg_net(self):
         model_in = IntermediateSequential(return_intermediate=False)
