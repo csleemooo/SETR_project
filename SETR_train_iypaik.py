@@ -15,14 +15,6 @@ from torchmetrics.functional import iou
 from torchvision import transforms
 import pdb
 
-def targetToOne(target):
-    onech_target = torch.zeros((4, 480, 480), dtype=torch.long)
-    for i in range(4):
-        onech_target[i] = target[i][0] * 1 + target[i][1] * 2 + target[i][2] *3
-    
-    return onech_target
-
-
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 colormap = {'IRF': [128, 0, 0],
